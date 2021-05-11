@@ -1,0 +1,65 @@
+FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu20.04
+
+LABEL SOFTWARE_NAME bonito 0.3.8
+LABEL MAINTAINER "Tom Harrop"
+LABEL VERSION "bonito 0.3.8"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LC_ALL=C
+
+RUN     apt-get clean && \
+        rm -r /var/lib/apt/lists/*
+
+RUN     . /etc/os-release \
+        echo "deb mirror://mirrors.ubuntu.com/mirrors.txt ${UBUNTU_CODENAME} main restricted universe multiverse" >> mirror.txt && \
+        echo "deb mirror://mirrors.ubuntu.com/mirrors.txt ${UBUNTU_CODENAME}-updates main restricted universe multiverse" >> mirror.txt && \
+        echo "deb mirror://mirrors.ubuntu.com/mirrors.txt ${UBUNTU_CODENAME}-backports main restricted universe multiverse" >> mirror.txt && \
+        echo "deb mirror://mirrors.ubuntu.com/mirrors.txt ${UBUNTU_CODENAME}-security main restricted universe multiverse" >> mirror.txt && \
+        mv /etc/apt/sources.list /etc/apt/sources.list.bak && \
+        cat mirror.txt /etc/apt/sources.list.bak > /etc/apt/sources.list && \
+        apt-get update && apt-get upgrade -y --fix-missing
+
+RUN     apt-get update && apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            libhdf5-dev \
+            python3-pip \
+            zlib1g-dev
+
+# cupy install
+RUN     python3 -m pip install \
+            cupy-cuda112 \
+            pyyaml
+
+# seqdist install
+RUN     git clone https://github.com/davidcpage/seqdist /seqdist
+WORKDIR /seqdist
+RUN     git checkout -f v0.0.3 && \
+        git submodule update --init --recursive && \
+        sed -i -e 's/cupy-cuda102/cupy-cuda112/g' settings.ini && \
+        python3 setup.py install
+
+# local pytorch build
+RUN     git clone --recursive https://github.com/pytorch/pytorch /pytorch
+WORKDIR /pytorch
+RUN     git checkout -f v1.8.1 && \
+        git submodule sync && \
+        git submodule update --init --recursive && \
+        python3 setup.py install
+
+# bonito build from source
+# see https://github.com/nanoporetech/bonito/issues/124#issuecomment-827971308
+RUN     git clone https://github.com/nanoporetech/bonito.git /bonito
+WORKDIR /bonito
+RUN     git checkout -f v0.3.8 && \
+        git submodule update --init --recursive && \
+        sed -i -e '/torch\|seqdist\|numpy/d' requirements.txt && \
+        python3 -m pip install -r requirements.txt && \
+        python3 -m pip install .
+
+# tidy up
+WORKDIR /
+RUN     rm -rf /seqdist /pytorch /bonito
+
+ENTRYPOINT ["/usr/local/bin/bonito"]
