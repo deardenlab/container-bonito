@@ -1,4 +1,6 @@
-FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu20.04
+FROM pytorch/pytorch:1.8.1-cuda11.1-cudnn8-devel
+
+# FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu20.04
 
 LABEL SOFTWARE_NAME bonito 0.3.8
 LABEL MAINTAINER "Tom Harrop"
@@ -24,12 +26,13 @@ RUN     apt-get update && apt-get install -y \
             cmake \
             git \
             libhdf5-dev \
+            liblaplack-dev \
             python3-pip \
             zlib1g-dev
 
 # cupy install
 RUN     python3 -m pip install \
-            cupy-cuda112 \
+            cupy-cuda111 \
             pyyaml
 
 # seqdist install
@@ -41,12 +44,12 @@ RUN     git checkout -f v0.0.3 && \
         python3 setup.py install
 
 # local pytorch build
-RUN     git clone --recursive https://github.com/pytorch/pytorch /pytorch
-WORKDIR /pytorch
-RUN     git checkout -f v1.8.1 && \
-        git submodule sync && \
-        git submodule update --init --recursive && \
-        python3 setup.py install
+# RUN     git clone --recursive https://github.com/pytorch/pytorch /pytorch
+# WORKDIR /pytorch
+# RUN     git checkout -f v1.8.1 && \
+#         git submodule sync && \
+#         git submodule update --init --recursive && \
+#         python3 setup.py install
 
 # bonito build from source
 # see https://github.com/nanoporetech/bonito/issues/124#issuecomment-827971308
@@ -60,6 +63,8 @@ RUN     git checkout -f v0.3.8 && \
 
 # tidy up
 WORKDIR /
-RUN     rm -rf /seqdist /pytorch /bonito
+RUN     rm -rf \
+            /seqdist /bonito
+            # /pytorch \
 
 ENTRYPOINT ["/usr/local/bin/bonito"]
